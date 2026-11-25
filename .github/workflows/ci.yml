@@ -6,8 +6,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@???        # 1. latest major version
-      - uses: astral-sh/setup-uv@???      # 2. latest major version
+      - uses: actions/checkout@7        # 1. latest major version
+      - uses: astral-sh/setup-uv@10      # 2. latest major version
       - run: uv sync --locked
       - run: uv run ruff check
       - run: uv run ruff format --check
