@@ -7,6 +7,7 @@ header so it doesn't end up in every chunk.
 Run with:  uv run python -m askhr.loader
 """
 
+import re
 import unicodedata
 from pathlib import Path
 
@@ -19,28 +20,35 @@ from askhr.text import normalize_whitespace
 
 MAX_HEADER_LINES = 20  # The header is always near the top; never cut deeper than this
 
+# The header block ends with one of these lines, in any order depending on the PDF:
+#   the page number, alone or at the end of a line: "Page 2 de 3", "… 2027-2028 Page 1 de 17"
+PAGE_NUMBER = re.compile(r"(?:^|\s)Page \d+ (?:de|sur) \d+$")
+#   the file name: "5_202a_Gestion…", "5,201_Code d'éthique_politique", "5_300 Conditions_de_…"
+#   (a policy number, then text containing at least one more underscore)
+FILE_NAME_START = re.compile(r"\d[_,]\d{3}[a-z]?\S*[ _].*_")
+#   the end of a file name that wrapped onto a second line: "… non syndiqués_dir_adm"
+FILE_NAME_END = re.compile(r"(?:_dir_adm|_politique|dir\. ?adm)\.?$")
 
-def header_marker(doc_id: str) -> str:
-    """Return how the file-name line of the page header starts.
 
-    The file name uses the policy number without any suffix:
-    "5,202a" -> "5_202a_", "5,203-dir" -> "5_203_", "5,400-res3" -> "5_400_".
-    """
-    number = doc_id.split("-")[0]
-    return number.replace(",", "_") + "_"
+def is_header_end(line: str) -> bool:
+    """True for the lines that close a page header: the page number or the file name."""
+    line = line.strip()
+    return bool(
+        PAGE_NUMBER.search(line) or FILE_NAME_START.match(line) or FILE_NAME_END.search(line)
+    )
 
 
-def clean_page(text: str, doc_id: str) -> str:
+def clean_page(text: str) -> str:
     """Remove the repeated page header and tidy the whitespace, keeping line breaks."""
     text = unicodedata.normalize("NFC", text)
     lines = text.splitlines()
 
-    marker = header_marker(doc_id)
-    for i, line in enumerate(lines[:MAX_HEADER_LINES]):
-        if line.strip().startswith(marker):
-            lines = lines[i + 1 :]  # Drop the header and the file-name line itself
-            break
-    # No marker found: unknown layout, so we keep the whole page rather than lose text.
+    # Cut after the LAST header-closing line near the top. Some PDFs put the file name
+    # first and "Page x de y" last, others the reverse, and some have no file name at all.
+    ends = [i for i, line in enumerate(lines[:MAX_HEADER_LINES]) if is_header_end(line)]
+    if ends:
+        lines = lines[ends[-1] + 1 :]
+    # No header line found: unknown layout, so we keep the whole page rather than lose text.
 
     tidy = (normalize_whitespace(line) for line in lines)
     return "\n".join(line for line in tidy if line)
@@ -60,7 +68,7 @@ def load_document(entry: ManifestEntry, raw_dir: Path) -> Document:
             f"{path} not found. Run first: uv run python -m askhr.connectors.downloader"
         )
     pages = tuple(
-        Page(number=number, text=clean_page(text, entry.doc_id))
+        Page(number=number, text=clean_page(text))
         for number, text in enumerate(extract_pages(path), start=1)
     )
     return Document.from_entry(entry, pages)

@@ -12,6 +12,7 @@ from askhr.models import Chunk, Document
 MAX_CHARS = 1500  # About 350-400 tokens of French; tuned later with the evals (M2)
 MIN_CHARS = 400  # A section shorter than this is merged with its neighbour when it fits
 MAX_HEADING_CHARS = 90  # A longer line is a sentence, not a heading
+MAX_NUMBERED_HEADING_WORDS = 12  # "7. Le Conseil veille à ce que la présente…" is a sentence
 
 # "2. Divulgation", "1.1.2. Harcèlement…": numbers ending with a dot, then a letter.
 # The letter rules out "1 2 3 4 s.o." and dates like "18 juillet 2024".
@@ -26,7 +27,12 @@ def is_heading(line: str) -> bool:
     if not line or len(line) > MAX_HEADING_CHARS:
         return False
     if NUMBERED.match(line):
-        return not COLON_THEN_TEXT.search(line)
+        is_sentence = (
+            COLON_THEN_TEXT.search(line) is not None
+            or line.endswith((".", ",", ";"))  # list items end with punctuation, headings don't
+            or len(line.split()) > MAX_NUMBERED_HEADING_WORDS
+        )
+        return not is_sentence
     letters = sum(1 for char in line if char.isalpha())
     return line.isupper() and letters >= 4  # "PRÉAMBULE", "MODALITÉS"
 
