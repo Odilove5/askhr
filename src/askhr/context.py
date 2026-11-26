@@ -9,6 +9,7 @@ Run with:  uv run python -m askhr.context [doc_id]      (default: 5,202a)
 """
 
 import math
+import re
 import sys
 from dataclasses import replace
 
@@ -24,7 +25,7 @@ from askhr.loader import load_all
 from askhr.models import Chunk, Document
 from askhr.settings import get_settings
 
-PROMPT_VERSION = "v3"  # Increase whenever the prompt changes: step 6c re-runs stale notes.
+PROMPT_VERSION = "v4"  # Increase whenever the prompt changes: step 6c re-runs stale notes.
 CHARS_PER_TOKEN = 3  # French is ~3-4 characters per token; 3 overestimates, which is safe.
 ANSWER_TOKENS = 512  # Room kept free in the window for the answer.
 NOTE_MAX_TOKENS = 200  # Hard cap on the answer, so a looping model stops.
@@ -39,6 +40,7 @@ Termine toujours par « Mots-clés : » suivi de 3 à 5 mots qu'un membre du per
 utiliserait pour chercher ce passage (par exemple : congé, plainte, délai, formulaire).
 Ne répète pas le titre du document : il est déjà connu. Ne commence pas par \
 « Cet extrait ».
+N'écris aucun numéro de page dans la note : les pages sont déjà connues.
 N'invente rien : utilise seulement ce qui est écrit dans le document.
 Réponds uniquement par la note, sans titre, sans guillemets et sans introduction."""
 
@@ -55,6 +57,30 @@ HUMAN = """<document titre="{title}">
 Note de contexte :"""
 
 CONTEXT_PROMPT = ChatPromptTemplate.from_messages([("system", SYSTEM), ("human", HUMAN)])
+
+# Safety net for the rule above. Page numbers live in the chunk metadata and a model can
+# get them wrong, so a note must never carry its own. Real gemma notes wrote them as
+# "(page 23)", "(pages 8-9)", "(10.5 à 12, pages 16-17)", "à la page 21", "de la page 18".
+_NUMS = r"\d+(?:\s*(?:-|–|,|et|à)\s*\d+)*"
+_PAGE = r"(?:pages?|p\.)\s*" + _NUMS
+PAGE_REFS = [
+    re.compile(r"\s*\(" + _PAGE + r"\s*\)", re.IGNORECASE),  # "(page 23)"
+    re.compile(r",\s*" + _PAGE + r"(?=\s*\))", re.IGNORECASE),  # "(10.5 à 12, pages 16-17)"
+    re.compile(r"\s*\b(?:à|de) la page\s*" + _NUMS + r"\b", re.IGNORECASE),  # "à la page 21"
+    re.compile(r"\s*\b(?:aux|des) pages\s*" + _NUMS + r"\b", re.IGNORECASE),  # "aux pages 8 et 9"
+]
+# Any page mention still left, reported by main() so a person can check it.
+PAGE_WORD = re.compile(r"\b(?:pages?|p\.)\s*\d", re.IGNORECASE)
+KEYWORDS = re.compile(r"\s*Mots-clés\s*:\s*", re.IGNORECASE)
+
+
+def clean_note(note: str) -> str:
+    """One line, no stray spaces, no page numbers, and always "Mots-clés : " the same way."""
+    for pattern in PAGE_REFS:
+        note = pattern.sub("", note)
+    note = KEYWORDS.sub(" Mots-clés : ", note)  # also "produits.Mots-clés:" seen in a real run
+    note = " ".join(note.split())
+    return re.sub(r"\s+([.,])", r"\1", note)  # French keeps its space before ":" and ";"
 
 
 class PromptTooLongError(ValueError):
@@ -139,7 +165,7 @@ def add_context(
     notes = chain.batch(inputs, config={"max_concurrency": max_concurrency})
     result = []
     for chunk, note in zip(chunks, notes, strict=True):
-        note = " ".join(note.split())  # one line, no stray spaces or line breaks
+        note = clean_note(note)
         if not note:
             raise ValueError(f"{chunk.chunk_id}: the model returned an empty note")
         result.append(replace(chunk, context=note))
@@ -170,9 +196,12 @@ def main() -> None:
     print(f"{doc_id}: {len(doc.text)} chars, {len(chunks)} chunks, window {num_ctx} tokens")
     print(f"prompt of chunk 0: estimated {prompt_tokens(first)} tokens, Ollama counted {counted}")
 
-    for chunk in add_context(doc, chunks, build_context_chain(model), max_prompt_tokens):
+    noted = add_context(doc, chunks, build_context_chain(model), max_prompt_tokens)
+    for chunk in noted:
         print(f"\n[{chunk.chunk_id}] {chunk.heading or '(sans titre)'}  p.{chunk.page_start}")
         print(f"  → {chunk.context}")
+    flagged = [chunk.chunk_id for chunk in noted if PAGE_WORD.search(chunk.context)]
+    print(f"\nnotes still naming a page: {len(flagged)} {flagged}")
 
 
 if __name__ == "__main__":

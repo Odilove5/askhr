@@ -7,10 +7,13 @@ from langchain_core.runnables import RunnableLambda
 from askhr.chunker import chunk_document
 from askhr.context import (
     CONTEXT_PROMPT,
+    PAGE_WORD,
+    SYSTEM,
     PromptTooLongError,
     add_context,
     build_context_chain,
     chunk_inputs,
+    clean_note,
     estimate_tokens,
     outline_and_neighbours,
     page_span,
@@ -184,6 +187,74 @@ def test_add_context_keeps_everything_else_and_leaves_originals_unchanged(
         assert after == Chunk(**{**before.__dict__, "context": "Note."})
     with pytest.raises(FrozenInstanceError):
         result[0].context = "x"  # type: ignore[misc]
+
+
+def test_prompt_forbids_page_numbers_in_the_note() -> None:
+    assert "N'écris aucun numéro de page" in SYSTEM
+
+
+@pytest.mark.parametrize(
+    ("raw", "clean"),
+    [
+        ("Annexe B (page 23), sur le consentement.", "Annexe B, sur le consentement."),
+        ("Section 3.3.4 (pages 8-9) : délais.", "Section 3.3.4 : délais."),
+        ("Annexe A (Pages 2 et 3).", "Annexe A."),
+        ("Section 2 (p. 4).", "Section 2."),
+        ("Annexe B (pages 25, 26 à 28) sur le Code.", "Annexe B sur le Code."),
+        ("Section 5 (pages 8–9).", "Section 5."),
+        (
+            "Les sections (10.5 à 12, pages 16-17) sur les dossiers.",
+            "Les sections (10.5 à 12) sur les dossiers.",
+        ),
+        ("Elle se trouve dans l'Annexe B à la page 21.", "Elle se trouve dans l'Annexe B."),
+        ("Cette section à la page 4 énumère les critères.", "Cette section énumère les critères."),
+        ("Le formulaire de la page 18 pour le dépôt.", "Le formulaire pour le dépôt."),
+        ("Les règles aux pages 8 et 9, puis la suite.", "Les règles, puis la suite."),
+        ("Note. Mots-clés:plainte, délai", "Note. Mots-clés : plainte, délai"),
+        ("Note. Mots-clés :plainte", "Note. Mots-clés : plainte"),
+        (
+            "Les documents produits.Mots-clés : enquête",
+            "Les documents produits. Mots-clés : enquête",
+        ),
+        ("Mots-clés : seul", "Mots-clés : seul"),
+    ],
+)
+def test_clean_note_removes_page_references_in_brackets(raw: str, clean: str) -> None:
+    assert clean_note(raw) == clean
+
+
+@pytest.mark.parametrize(
+    "note",
+    [
+        "Délai de dix (10) jours calendaires. Mots-clés : délai, plainte",
+        "Article 3 (2) de la Loi (L.R.O. 1990, chap. H.19).",
+        "La page web du Conseil (section 5).",
+        "La page de garde du formulaire, à la page web.",
+        "Les sections 10.5 à 12 (dossiers et affichage).",
+    ],
+)
+def test_clean_note_keeps_other_brackets(note: str) -> None:
+    assert clean_note(note) == note
+
+
+def test_clean_note_is_stable() -> None:
+    note = "Annexe D (pages 23 à 26) à la page 23. Mots-clés:Code, consentement"
+    assert (
+        clean_note(clean_note(note))
+        == clean_note(note)
+        == "Annexe D. Mots-clés : Code, consentement"
+    )
+
+
+def test_page_word_flags_page_mentions_left_without_brackets() -> None:
+    assert PAGE_WORD.search("Elle se trouve à la page 23.")
+    assert PAGE_WORD.search("voir p. 4")
+    assert not PAGE_WORD.search("La page web du Conseil (section 5).")
+
+
+def test_add_context_strips_page_references(doc: Document, chunks: list[Chunk]) -> None:
+    chain = build_context_chain(FakeListChatModel(responses=["Annexe B (page 23)."] * len(chunks)))
+    assert {chunk.context for chunk in add_context(doc, chunks, chain, BIG)} == {"Annexe B."}
 
 
 def test_empty_list_never_calls_the_model(doc: Document) -> None:
