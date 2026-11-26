@@ -2,9 +2,8 @@
 
 [![CI](https://github.com/Odilove5/askhr/actions/workflows/ci.yml/badge.svg)](https://github.com/Odilove5/askhr/actions/workflows/ci.yml)
 
-**AskHR** is a bilingual (French/English) HR assistant for Ontario school boards.
-Staff ask questions in plain language ("How many days of parental leave do I get?"),
-and AskHR answers from the board's own HR documents (policies, administrative
+**AskHR** is a bilingual (French/English) HR assistant for businesses. Staff ask questions in plain language ("How many days of parental leave do I get?"),
+and AskHR answers from the company's own HR documents (policies, administrative
 directives, collective agreements, benefits booklets), **cites its sources**, and
 **hands off to the right HR contact** when the documents don't answer the question.
 
