@@ -5,3 +5,8 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .DS_Store
+
+# Downloaded documents (copyrighted, never commit)
+data/
+# Full saved web page, kept locally for reference only
+tests/fixtures/viamonde_index_full.html

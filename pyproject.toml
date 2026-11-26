@@ -5,10 +5,15 @@ build-backend = "hatchling.build"
 [project]
 name = "askhr"
 dynamic = ["version"]
-description = "Bilingual (FR/EN) HR assistant for Ontario school boards that answers staff questions from the board's own HR documents, cites its sources, and hands off to HR when it can't answer."
+description = "Bilingual (FR/EN) HR assistant for businesses that answers staff questions from the company's own HR documents, cites its sources, and hands off to HR when it can't answer."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "beautifulsoup4>=4.15.0",
+    "httpx>=0.28.1",
+    "pyyaml>=6.0.4",
+    "types-pyyaml>=6.0.12.20261122",
+]
 
 [tool.hatch.version]
 path = "src/askhr/__init__.py"
