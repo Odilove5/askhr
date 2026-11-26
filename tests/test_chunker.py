@@ -1,6 +1,6 @@
 import pytest
 
-from askhr.chunker import chunk_document, is_heading
+from askhr.chunker import MAX_CHARS, TINY_CHARS, _Section, chunk_document, is_heading, pack
 from askhr.models import Document, Page
 
 # Made-up text shaped like a Viamonde directive (we never copy their text into the repo).
@@ -39,6 +39,7 @@ def all_lines(doc: Document) -> list[str]:
         "2.3. Confidentialité",
         "1.1.2. Harcèlement basé sur l'orientation",
         "2.1.1. La plainte peut être déposée :",
+        "TYPE D’INCIDENT (À SPÉCIFIER)",
     ],
 )
 def test_is_heading_accepts_headings(line: str) -> None:
@@ -60,6 +61,9 @@ def test_is_heading_accepts_headings(line: str) -> None:
         "",
         "N.B.",
         "X" * 120,
+        "PLUS HAUT)",  # the end of a wrapped line
+        "X X X X",  # a table row of check marks
+        "ON M7A 2A5",  # a postal code
     ],
 )
 def test_is_heading_rejects_other_lines(line: str) -> None:
@@ -136,3 +140,57 @@ def test_chunks_carry_document_metadata_and_ids() -> None:
 
 def test_an_empty_document_has_no_chunks() -> None:
     assert chunk_document(make_doc("", "")) == []
+
+
+def body(chars: int, word: str = "texte") -> str:
+    """Made-up lines of about `chars` characters in total."""
+    line = f"Une ligne de {word} fictif pour remplir la section."
+    return "\n".join([line] * (chars // (len(line) + 1)))
+
+
+def test_a_long_section_is_split_into_balanced_pieces() -> None:
+    doc = make_doc("3. Longue règle\n" + body(1700))
+
+    sizes = [len(chunk.text) for chunk in chunk_document(doc)]
+
+    assert len(sizes) == 2
+    assert min(sizes) > 600  # not 1,500 + a tiny leftover
+
+
+def test_a_lone_heading_joins_the_text_after_it_even_past_the_budget() -> None:
+    rule = "1. Règle\n" + ("Une phrase fictive. " * 80)[:1486]  # a 1,495-character section
+    doc = make_doc("PRÉAMBULE\n" + body(500) + "\nMODALITÉS\n" + rule)
+
+    chunks = chunk_document(doc)
+
+    assert [chunk.heading for chunk in chunks] == ["PRÉAMBULE", "MODALITÉS"]
+    assert chunks[1].text.startswith("MODALITÉS\n1. Règle\n")
+    assert MAX_CHARS < len(chunks[1].text) <= MAX_CHARS + TINY_CHARS
+
+
+def test_a_chunk_starting_with_a_tail_is_named_after_its_main_section() -> None:
+    tail = _Section(heading="8. Huit", lines=[(15, "l’administration du Conseil.")])
+    nine = _Section(heading="9. Neuf", lines=[(15, "9. Neuf"), (15, body(600))])
+
+    [chunk] = pack([tail, nine])
+
+    assert chunk.heading == "9. Neuf"
+    assert chunk.text().startswith("l’administration du Conseil.\n9. Neuf")
+
+
+def test_a_chunk_starting_with_a_heading_keeps_it() -> None:
+    chunks = chunk_document(make_doc("MODALITÉS\n1. Règle\nCourt.\n2. Autre\n" + body(800)))
+
+    assert [chunk.heading for chunk in chunks] == ["MODALITÉS"]
+
+
+def test_no_chunk_passes_the_budget_by_more_than_the_tiny_allowance() -> None:
+    pages = [f"{n}. Section {n}\n" + body(137 * n, word=str(n)) for n in range(1, 15)]
+    doc = make_doc(*pages)
+
+    for max_chars in (300, 800, 1500):
+        tiny = TINY_CHARS * max_chars // MAX_CHARS
+        chunks = chunk_document(doc, max_chars=max_chars)
+        assert all(len(chunk.text) <= max_chars + tiny for chunk in chunks)
+        chunk_lines = [line for chunk in chunks for line in chunk.text.splitlines()]
+        assert chunk_lines == all_lines(doc)  # and nothing is lost

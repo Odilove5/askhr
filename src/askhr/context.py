@@ -24,16 +24,21 @@ from askhr.loader import load_all
 from askhr.models import Chunk, Document
 from askhr.settings import get_settings
 
-PROMPT_VERSION = "v1"  # Increase whenever the prompt changes: step 6c re-runs stale notes.
+PROMPT_VERSION = "v3"  # Increase whenever the prompt changes: step 6c re-runs stale notes.
 CHARS_PER_TOKEN = 3  # French is ~3-4 characters per token; 3 overestimates, which is safe.
 ANSWER_TOKENS = 512  # Room kept free in the window for the answer.
 NOTE_MAX_TOKENS = 200  # Hard cap on the answer, so a looping model stops.
 
 SYSTEM = """Tu rédiges des notes de contexte pour la recherche dans les documents RH \
 d'un conseil scolaire.
-On te donne un document, puis un extrait de ce document.
-Écris en français une note de 1 ou 2 phrases (au plus 60 mots) qui situe l'extrait : \
-de quel document il vient, dans quelle section, et de quoi il parle.
+On te donne un document, découpé en pages, puis un extrait de ce document avec ses pages.
+Écris en français une note de 1 ou 2 phrases (au plus 50 mots) qui dit dans quelle \
+section (ou annexe) se trouve l'extrait et de quoi il parle. Sers-toi des numéros de page \
+pour situer l'extrait : un même texte peut se répéter à plusieurs endroits.
+Termine toujours par « Mots-clés : » suivi de 3 à 5 mots qu'un membre du personnel \
+utiliserait pour chercher ce passage (par exemple : congé, plainte, délai, formulaire).
+Ne répète pas le titre du document : il est déjà connu. Ne commence pas par \
+« Cet extrait ».
 N'invente rien : utilise seulement ce qui est écrit dans le document.
 Réponds uniquement par la note, sans titre, sans guillemets et sans introduction."""
 
@@ -43,7 +48,7 @@ HUMAN = """<document titre="{title}">
 {document}
 </document>
 
-<extrait section="{heading}">
+<extrait section="{heading}" pages="{pages}">
 {chunk}
 </extrait>
 
@@ -75,6 +80,18 @@ def outline_and_neighbours(chunks: list[Chunk], index: int) -> str:
     )
 
 
+def paged_text(doc: Document) -> str:
+    """The document text with a "[page N]" marker before each page, so the model can tell
+    apart passages that repeat (the same privacy notice ends Annexe A and Annexe B)."""
+    return "\n\n".join(f"[page {page.number}]\n{page.text}" for page in doc.pages)
+
+
+def page_span(chunk: Chunk) -> str:
+    if chunk.page_start == chunk.page_end:
+        return str(chunk.page_start)
+    return f"{chunk.page_start}-{chunk.page_end}"
+
+
 def chunk_inputs(
     doc: Document, chunks: list[Chunk], index: int, max_prompt_tokens: int
 ) -> dict[str, str]:
@@ -82,8 +99,9 @@ def chunk_inputs(
     chunk = chunks[index]
     inputs = {
         "title": doc.title,
-        "document": doc.text,
+        "document": paged_text(doc),
         "heading": chunk.heading or "(sans titre)",
+        "pages": page_span(chunk),
         "chunk": chunk.text,
     }
     if prompt_tokens(inputs) <= max_prompt_tokens:

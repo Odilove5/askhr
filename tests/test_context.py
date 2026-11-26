@@ -13,6 +13,8 @@ from askhr.context import (
     chunk_inputs,
     estimate_tokens,
     outline_and_neighbours,
+    page_span,
+    paged_text,
     prompt_tokens,
 )
 from askhr.models import Chunk, Document, Page
@@ -73,10 +75,24 @@ def test_chunk_inputs_uses_the_whole_document_when_it_fits(
     inputs = chunk_inputs(doc, chunks, 1, BIG)
     assert inputs == {
         "title": "Congés fictifs",
-        "document": doc.text,
+        "document": paged_text(doc),
         "heading": chunks[1].heading,
+        "pages": page_span(chunks[1]),
         "chunk": chunks[1].text,
     }
+
+
+def test_the_document_is_sent_with_page_markers(doc: Document) -> None:
+    text = paged_text(doc)
+    assert text.startswith("[page 1]\nPRÉAMBULE")
+    assert "\n\n[page 2]\n2. Retour au travail" in text
+
+
+def test_page_span_is_one_number_or_a_range(chunks: list[Chunk]) -> None:
+    one_page = next(chunk for chunk in chunks if chunk.page_start == chunk.page_end)
+    assert page_span(one_page) == str(one_page.page_start)
+    spanning = Chunk(**{**one_page.__dict__, "page_end": one_page.page_start + 1})
+    assert page_span(spanning) == f"{one_page.page_start}-{one_page.page_start + 1}"
 
 
 def test_chunk_without_heading_gets_a_placeholder(doc: Document) -> None:
@@ -90,7 +106,8 @@ def test_prompt_puts_the_document_first_and_the_chunk_last(
 ) -> None:
     messages = CONTEXT_PROMPT.format_messages(**chunk_inputs(doc, chunks, 1, BIG))
     human = str(messages[-1].content)
-    assert human.index(doc.text) < human.index("<extrait")
+    assert human.index(paged_text(doc)) < human.index("<extrait")
+    assert f'pages="{page_span(chunks[1])}"' in human
     assert human.rstrip().endswith("Note de contexte :")
 
 
@@ -133,9 +150,9 @@ def test_prompt_that_cannot_fit_raises_instead_of_being_cut(
 
 def test_chain_returns_the_model_text() -> None:
     chain = build_context_chain(FakeListChatModel(responses=["  Note.  "]))
-    assert chain.invoke({"title": "t", "document": "d", "heading": "h", "chunk": "c"}) == (
-        "  Note.  "
-    )
+    assert chain.invoke(
+        {"title": "t", "document": "d", "heading": "h", "pages": "1", "chunk": "c"}
+    ) == ("  Note.  ")
 
 
 def test_add_context_stores_one_clean_line_per_chunk(doc: Document, chunks: list[Chunk]) -> None:
