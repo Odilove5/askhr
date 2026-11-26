@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     ollama_model: str = "hf.co/unsloth/gemma-4-12b-it-GGUF:UD-Q5_K_XL"
     ollama_base_url: str = "http://localhost:11434"
     ollama_num_ctx: int = Field(default=8192, gt=0)
+    # Bigger window for the contextual notes, which read a whole document (up to ~53k chars).
+    ollama_num_ctx_long: int = Field(default=32768, gt=0)
     ollama_reasoning: bool = False
 
     # Cloud model (Claude API). Off unless explicitly turned on: the kill switch.

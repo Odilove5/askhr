@@ -74,6 +74,23 @@ def test_local_model_uses_settings() -> None:
     assert model.reasoning is False
 
 
+def test_local_model_overrides_window_and_answer_length() -> None:
+    model = get_chat_model("local", make_settings(), num_ctx=32768, num_predict=200)
+    assert isinstance(model, ChatOllama)
+    assert model.num_ctx == 32768
+    assert model.num_predict == 200
+    default = get_chat_model("local", make_settings())
+    assert isinstance(default, ChatOllama)
+    assert default.num_ctx == 8192
+    assert default.num_predict is None
+
+
+def test_local_only_options_are_refused_for_cloud() -> None:
+    settings = make_settings(cloud_enabled=True, anthropic_api_key=SecretStr(FAKE_KEY))
+    with pytest.raises(ValueError, match="local model"):
+        get_chat_model("cloud", settings, num_ctx=32768)
+
+
 def test_cloud_is_refused_when_disabled_even_with_a_key() -> None:
     settings = make_settings(cloud_enabled=False, anthropic_api_key=SecretStr(FAKE_KEY))
     with pytest.raises(CloudDisabledError, match="ASKHR_CLOUD_ENABLED"):

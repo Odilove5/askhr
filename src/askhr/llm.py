@@ -21,19 +21,31 @@ class CloudDisabledError(RuntimeError):
 
 
 def get_chat_model(
-    kind: ModelKind, settings: Settings | None = None, *, strong: bool = False
+    kind: ModelKind,
+    settings: Settings | None = None,
+    *,
+    strong: bool = False,
+    num_ctx: int | None = None,
+    num_predict: int | None = None,
 ) -> BaseChatModel:
-    """Return a chat model. ``strong`` picks the stronger Claude model (cloud only)."""
+    """Return a chat model.
+
+    ``strong`` picks the stronger Claude model (cloud only). ``num_ctx`` (context window)
+    and ``num_predict`` (answer length cap) override the settings, local only.
+    """
     settings = settings or get_settings()
     if kind == "local":
         return ChatOllama(
             model=settings.ollama_model,
             base_url=settings.ollama_base_url,
-            num_ctx=settings.ollama_num_ctx,
+            num_ctx=num_ctx or settings.ollama_num_ctx,
+            num_predict=num_predict,
             reasoning=settings.ollama_reasoning,
             temperature=0,
         )
     if kind == "cloud":
+        if num_ctx is not None or num_predict is not None:
+            raise ValueError("num_ctx and num_predict only apply to the local model")
         if not settings.cloud_enabled:
             raise CloudDisabledError("Cloud models are off. Set ASKHR_CLOUD_ENABLED=true to allow.")
         key = settings.anthropic_api_key
