@@ -10,3 +10,4 @@ __pycache__/
 data/
 # Full saved web page, kept locally for reference only
 tests/fixtures/viamonde_index_full.html
+Learning_Python/

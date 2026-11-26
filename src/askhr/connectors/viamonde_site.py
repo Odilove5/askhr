@@ -29,6 +29,7 @@ INDEX_URL = (
     "https://csviamonde.ca/administration-et-gouvernance/politiques-et-directives-administratives"
 )
 HR_PREFIX = "5,"  # Human resources policies are numbered 5,xxx
+MIN_EXPECTED = 30  # Fewer HR documents than this means the page layout probably changed
 
 # "5,202a Gestion des absences" or "5,401 a" -> captures "5,202a" / "5,401 a"
 _CODE_IN_TEXT = re.compile(r"^(\d,\d{3}\s?[a-z])\b\s*")
@@ -154,6 +155,11 @@ def main() -> None:
     """Fetch the page, keep the HR documents (5,xxx) and write corpus/manifest.yaml."""
     output = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("corpus/manifest.yaml")
     entries = [e for e in parse_index(fetch_index(), INDEX_URL) if e.doc_id.startswith(HR_PREFIX)]
+    if len(entries) < MIN_EXPECTED:
+        raise SystemExit(
+            f"Expected at least {MIN_EXPECTED} HR documents but found {len(entries)}; "
+            "the page layout may have changed. Manifest not written."
+        )
     write_manifest(entries, output)
     print(f"Wrote {len(entries)} entries to {output}")
 

@@ -1,7 +1,9 @@
+import sys
 from pathlib import Path
 
 import pytest
 
+from askhr.connectors import viamonde_site
 from askhr.connectors.viamonde_site import ManifestEntry, parse_index
 
 FIXTURE = Path(__file__).parent / "fixtures" / "viamonde_index.html"
@@ -46,3 +48,16 @@ def test_urls_are_absolute(entries: list[ManifestEntry]) -> None:
 
 def test_empty_page_gives_no_entries() -> None:
     assert parse_index("<html><body></body></html>", BASE_URL) == []
+
+
+def test_main_refuses_to_write_a_suspiciously_small_manifest(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    output = tmp_path / "manifest.yaml"
+    monkeypatch.setattr(viamonde_site, "fetch_index", lambda: "<html><body></body></html>")
+    monkeypatch.setattr(sys, "argv", ["viamonde_site", str(output)])
+
+    with pytest.raises(SystemExit, match="layout may have changed"):
+        viamonde_site.main()
+
+    assert not output.exists()
