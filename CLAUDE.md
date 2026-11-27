@@ -92,7 +92,7 @@ Templates are in `docs/steps/README.md`.
 
 **Learning from mistakes:** any mistake made twice gets a rule in this file.
 
-**Hooks** (`.claude/settings.json`) enforce the rules that must always hold: edits to `data/`, `.env` and `uv.lock` are blocked, text that looks like a secret is blocked, and every edited Python file is formatted and linted. Don't work around a blocked edit; ask the owner.
+**Hooks and permissions** (`.claude/settings.json`) enforce the rules that must always hold: no edits to `data/`, `.env` or `uv.lock` (with the edit tools or with shell commands), no reading `.env`, no text that looks like a secret, and every edited Python file is formatted and linted. Running the project's own commands (which write to `data/`) is fine. Don't work around a block, with a shell command or otherwise; ask the owner.
 
 ## Commits
 
