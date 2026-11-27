@@ -214,6 +214,11 @@ def test_prompt_forbids_page_numbers_in_the_note() -> None:
         ("Elle se trouve dans l'Annexe B à la page 21.", "Elle se trouve dans l'Annexe B."),
         ("Cette section à la page 4 énumère les critères.", "Cette section énumère les critères."),
         ("Le formulaire de la page 18 pour le dépôt.", "Le formulaire pour le dépôt."),
+        # Seen in the first full run (5,400-res3#17), made-up text here.
+        (
+            "L'extrait est à l'Annexe 4 et débute sur la page 19.",
+            "L'extrait est à l'Annexe 4 et débute.",
+        ),
         ("Les règles aux pages 8 et 9, puis la suite.", "Les règles, puis la suite."),
         ("Note. Mots-clés:plainte, délai", "Note. Mots-clés : plainte, délai"),
         ("Note. Mots-clés :plainte", "Note. Mots-clés : plainte"),

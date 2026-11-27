@@ -177,6 +177,18 @@ def test_key_depends_on_model_name() -> None:
     assert set(a.keys).isdisjoint(b.keys)
 
 
+def test_cached_notes_are_cleaned_again_when_read(tmp_path: Path) -> None:
+    # A note cached before a clean_note fix must get that fix too, with no model call.
+    plans = plan_run([make_doc()], BIG, "m")
+    cache = NotesCache(tmp_path / "notes.jsonl")
+    for chunk, key in zip(plans[0].chunks, plans[0].keys, strict=True):
+        cache.put(key, chunk.chunk_id, "Annexe B (page 23). Mots-clés : congé")
+    unused = ok(0)
+    chunks, _ = run(plans, cache, unused, unused, log=quiet)
+    assert unused.calls == 0
+    assert all(c.context == "Annexe B. Mots-clés : congé" for c in chunks)
+
+
 def test_run_all_new_then_all_cached(tmp_path: Path) -> None:
     plans = plan_run([make_doc()], BIG, "m")
     n = len(plans[0].chunks)
