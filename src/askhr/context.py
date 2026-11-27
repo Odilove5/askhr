@@ -60,13 +60,14 @@ CONTEXT_PROMPT = ChatPromptTemplate.from_messages([("system", SYSTEM), ("human",
 
 # Safety net for the rule above. Page numbers live in the chunk metadata and a model can
 # get them wrong, so a note must never carry its own. Real gemma notes wrote them as
-# "(page 23)", "(pages 8-9)", "(10.5 à 12, pages 16-17)", "à la page 21", "de la page 18".
+# "(page 23)", "(pages 8-9)", "(10.5 à 12, pages 16-17)", "à la page 21", "de la page 18",
+# "sur la page 19".
 _NUMS = r"\d+(?:\s*(?:-|–|,|et|à)\s*\d+)*"
 _PAGE = r"(?:pages?|p\.)\s*" + _NUMS
 PAGE_REFS = [
     re.compile(r"\s*\(" + _PAGE + r"\s*\)", re.IGNORECASE),  # "(page 23)"
     re.compile(r",\s*" + _PAGE + r"(?=\s*\))", re.IGNORECASE),  # "(10.5 à 12, pages 16-17)"
-    re.compile(r"\s*\b(?:à|de) la page\s*" + _NUMS + r"\b", re.IGNORECASE),  # "à la page 21"
+    re.compile(r"\s*\b(?:à|de|sur) la page\s*" + _NUMS + r"\b", re.IGNORECASE),  # "à la page 21"
     re.compile(r"\s*\b(?:aux|des) pages\s*" + _NUMS + r"\b", re.IGNORECASE),  # "aux pages 8 et 9"
 ]
 # Any page mention still left, reported by main() so a person can check it.

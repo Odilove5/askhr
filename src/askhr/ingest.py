@@ -28,6 +28,7 @@ from askhr.context import (
     PROMPT_VERSION,
     NoteCutError,
     chunk_inputs,
+    clean_note,
     generate_note,
 )
 from askhr.llm import get_chat_model
@@ -200,6 +201,8 @@ def run(
                 new += 1
                 stats.retried += retried
             else:
+                # Clean again: a note cached before a clean_note fix gets the fix too.
+                note = clean_note(note)
                 cached += 1
             result.append(replace(chunk, context=note))
         stats.cached += cached
