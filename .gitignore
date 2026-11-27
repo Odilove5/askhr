@@ -11,3 +11,5 @@ data/
 # Full saved web page, kept locally for reference only
 tests/fixtures/viamonde_index_full.html
 Learning_Python/
+# Personal Claude Code settings (the shared ones are .claude/settings.json)
+.claude/settings.local.json

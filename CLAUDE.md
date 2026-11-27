@@ -78,6 +78,22 @@ The planned stack is fixed: Postgres 16 + pgvector for search (M2), LangGraph fo
 - A prompt rule is a request, not a guarantee: back important rules with a check in code (as `clean_note` does for page numbers).
 - Never let a prompt be cut silently: estimate its size first and raise if it doesn't fit the window.
 
+## Workflow for each step
+
+1. The owner writes `docs/steps/<step>/intent.md`.
+2. We agree on `spec.md` (including **done when**), then `plan.md`. Commit each one.
+3. Build in small steps, following the plan; update `plan.md` if the code has to differ.
+4. Verify: the four checks, then a second check on the full real data.
+5. Fill in the Result section of `plan.md`.
+
+Templates are in `docs/steps/README.md`.
+
+**Bugs:** first commit a test that fails because of the bug, then fix the code without changing that test.
+
+**Learning from mistakes:** any mistake made twice gets a rule in this file.
+
+**Hooks** (`.claude/settings.json`) enforce the rules that must always hold: edits to `data/`, `.env` and `uv.lock` are blocked, text that looks like a secret is blocked, and every edited Python file is formatted and linted. Don't work around a blocked edit; ask the owner.
+
 ## Commits
 
 Small commits with conventional messages: `feat:`, `fix:`, `docs:`, `test:`, `chore:`. Run the four checks first. The owner reviews and commits.
