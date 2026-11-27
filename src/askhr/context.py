@@ -87,6 +87,24 @@ class PromptTooLongError(ValueError):
     """Even the short fallback prompt does not fit in the model's context window."""
 
 
+class NoteCutError(ValueError):
+    """The model hit its answer-length cap (num_predict) before finishing the note."""
+
+
+def generate_note(model: BaseChatModel, inputs: dict[str, str]) -> str:
+    """One chunk's note, or a clear error if the note is cut, empty or not text."""
+    reply = (CONTEXT_PROMPT | model).invoke(inputs)
+    if reply.response_metadata.get("done_reason") == "length":
+        raise NoteCutError("the model hit its answer-length cap before finishing the note")
+    content = reply.content
+    if not isinstance(content, str):
+        raise TypeError(f"expected text from the model, got {type(content).__name__}")
+    note = clean_note(content)
+    if not note:
+        raise ValueError("the model returned an empty note")
+    return note
+
+
 def estimate_tokens(text: str) -> int:
     return math.ceil(len(text) / CHARS_PER_TOKEN)
 

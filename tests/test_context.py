@@ -1,7 +1,10 @@
 from dataclasses import FrozenInstanceError
+from typing import Any
 
 import pytest
+from langchain_core.language_models import GenericFakeChatModel
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
+from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 
 from askhr.chunker import chunk_document
@@ -9,12 +12,14 @@ from askhr.context import (
     CONTEXT_PROMPT,
     PAGE_WORD,
     SYSTEM,
+    NoteCutError,
     PromptTooLongError,
     add_context,
     build_context_chain,
     chunk_inputs,
     clean_note,
     estimate_tokens,
+    generate_note,
     outline_and_neighbours,
     page_span,
     paged_text,
@@ -284,3 +289,44 @@ def test_too_long_prompt_fails_before_any_model_call(doc: Document, chunks: list
 
     with pytest.raises(PromptTooLongError):
         add_context(doc, chunks, RunnableLambda(fail), 50)
+
+
+# generate_note: one reply from the model, checked before it becomes a note (step 6c, row 1).
+NOTE_INPUTS = {
+    "title": "Directive fictive",
+    "document": "[page 1]\nTexte fictif.",
+    "heading": "Section fictive",
+    "pages": "1",
+    "chunk": "Extrait fictif.",
+}
+
+
+def fake_model(content: Any, done_reason: str | None = "stop") -> GenericFakeChatModel:
+    """A fake model that sends one scripted reply; done_reason=None sends no metadata."""
+    metadata = {} if done_reason is None else {"done_reason": done_reason}
+    reply = AIMessage(content=content, response_metadata=metadata)
+    return GenericFakeChatModel(messages=iter([reply]))
+
+
+def test_generate_note_returns_the_cleaned_note() -> None:
+    model = fake_model("Annexe B (page 23).  Mots-clés: congé")
+    assert generate_note(model, NOTE_INPUTS) == "Annexe B. Mots-clés : congé"
+
+
+def test_generate_note_raises_when_the_note_is_cut() -> None:
+    with pytest.raises(NoteCutError, match="answer-length cap"):
+        generate_note(fake_model("Une note coup", done_reason="length"), NOTE_INPUTS)
+
+
+def test_generate_note_raises_on_an_empty_note() -> None:
+    with pytest.raises(ValueError, match="empty note"):
+        generate_note(fake_model("   "), NOTE_INPUTS)
+
+
+def test_generate_note_refuses_a_reply_that_is_not_text() -> None:
+    with pytest.raises(TypeError, match="expected text"):
+        generate_note(fake_model(["une", "liste"]), NOTE_INPUTS)
+
+
+def test_generate_note_works_when_the_model_sends_no_done_reason() -> None:
+    assert generate_note(fake_model("Note.", done_reason=None), NOTE_INPUTS) == "Note."
