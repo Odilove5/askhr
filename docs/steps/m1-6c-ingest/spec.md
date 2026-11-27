@@ -59,13 +59,13 @@ Command options:
 
 ## Done when
 
-- [ ] `uv run python -m askhr.ingest --dry-run` reports 37 documents, about 416 chunks, every prompt fits, 0 model calls.
-- [ ] A full real run on the Mac writes `data/chunks.jsonl` with one line per chunk, each with a non-empty note.
-- [ ] Interrupting the full run, then re-running, finishes without redoing the notes already written (the report shows them as cached).
-- [ ] A second run with nothing changed makes 0 model calls, and `md5` of `chunks.jsonl` is unchanged.
-- [ ] Check report: 0 notes naming a page, 0 notes without keywords, 0 cut notes; any joined words listed and reviewed.
-- [ ] Tests with fake models cover: cache hit and miss, key changes, resume after a failure halfway, atomic output, cut-note retry, broken cache line, `--doc` and `--dry-run`.
-- [ ] The four CI checks pass.
+- [x] `uv run python -m askhr.ingest --dry-run` reports 37 documents, about 416 chunks, every prompt fits, 0 model calls.
+- [x] A full real run on the Mac writes `data/chunks.jsonl` with one line per chunk, each with a non-empty note.
+- [x] Interrupting the full run, then re-running, finishes without redoing the notes already written (the report shows them as cached).
+- [x] A second run with nothing changed makes 0 model calls, and `md5` of `chunks.jsonl` is unchanged.
+- [x] Check report: 0 notes naming a page, 0 notes without keywords, 0 cut notes; any joined words listed and reviewed.
+- [x] Tests with fake models cover: cache hit and miss, key changes, resume after a failure halfway, atomic output, cut-note retry, broken cache line, `--doc` and `--dry-run`.
+- [ ] The four CI checks pass. (They pass locally; tick once GitHub Actions shows green.)
 
 ## Decisions (agreed 2026-11-27)
 

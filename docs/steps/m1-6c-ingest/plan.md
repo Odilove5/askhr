@@ -21,4 +21,23 @@ Follows `spec.md`. Each row is one small, testable change; the four CI checks pa
 
 ## Result
 
-(filled in at the end of the step)
+**Built** (2026-11-27): `generate_note` with cut-note detection (row 1), `notes_cache.py` (row 2), and `ingest.py` with the atomic writer, plan, Ollama pre-flight, run with one retry, check report and command line (rows 3 to 8). 193 tests, all with fake models.
+
+**Differences from the plan**
+- The cache key hashes the four parts as a JSON list instead of joining them with a separator (row 2).
+- `DocPlan` holds `chunks`, `inputs` and `keys` tuples and a `todo(cache)` method, instead of one `Job` per chunk (row 4).
+- Rows 4 to 8 were written in one go rather than row by row; four `main()` tests were added afterwards because deleting the output write was not caught.
+- `run()` cleans cached notes again when reading them, so a later `clean_note` fix reaches notes already in the cache without a model call.
+
+**Second check on the real corpus (Mac, gemma-4-12b, num_ctx 32768)**
+- `--dry-run`: 37 documents (manifest: 37), 416 chunks, every prompt fits, 0 in cache.
+- `--doc 5,202a`: 4 notes in 21 s.
+- Full run, interrupted with Ctrl+C and resumed: 30 notes reused from the cache, 386 new, 0 retried, about 33 minutes. 416 lines, none with an empty note.
+- Second run: 0 model calls, md5 unchanged.
+- Report: 1 note naming a page (`5,400-res3#17`, "sur la page 19"). Fixed test-first (e1c05b9, 6db5851); on the 416 real notes the fix changes only that note. After the fix: 0 notes naming a page, 0 without keywords, 0 joined words; two runs give the same md5 (`020c7c5b…`).
+- Random sample of 10 notes read against their chunks: all faithful.
+
+**Left for step 6d**
+- Chunker headings: `5,300#21` has the heading "(RCICD)"; `5,400-res3#9` probably carries the next section's heading.
+- One note starts with "Cet extrait" (`5,400-res3#20`); one note is 73 words (rule: 50 at most). Cosmetic, prompt rules only.
+- Read about 50 random chunks with their notes, then tag v0.2.0.
