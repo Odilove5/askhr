@@ -23,7 +23,7 @@ It is built as an agentic, corrective RAG system with contextual retrieval, usin
 | M6 | FastAPI app, chat UI, Docker, deployed in Canada | Feb 12, 2027 |
 | M7 | Portfolio: architecture diagram, demo video, lessons learned | Feb 21, 2027 |
 
-M1 so far: website connector, downloader, data model, PDF loader, chunker, settings, model factory, and the contextual-notes chain. Next: a one-command ingest that writes every chunk with its note.
+M1 so far: website connector, downloader, data model, PDF loader, chunker, settings, model factory, the contextual-notes chain, and a one-command ingest (`askhr.ingest`) with a resumable notes cache. Next: the M1 review and tag v0.2.0.
 
 ## How it works (so far)
 
@@ -73,6 +73,8 @@ uv run python -m askhr.loader                     # read and clean the PDFs
 uv run python -m askhr.chunker                    # cut them into chunks
 ollama pull hf.co/unsloth/gemma-4-12b-it-GGUF:UD-Q5_K_XL
 uv run python -m askhr.context 5,202a             # contextual notes for one document
+uv run python -m askhr.ingest --dry-run           # check every prompt fits, count the notes to write
+uv run python -m askhr.ingest                     # every chunk with its note -> data/chunks.jsonl
 ```
 
 ## Configuration
@@ -104,7 +106,9 @@ askhr/
 │   ├── chunker.py                 # pages -> chunks by section
 │   ├── settings.py                # configuration (ASKHR_ variables, .env)
 │   ├── llm.py                     # builds the local or cloud chat model
-│   └── context.py                 # contextual-notes chain (LCEL)
+│   ├── context.py                 # contextual-notes chain (LCEL)
+│   ├── notes_cache.py             # notes already written (resumable runs)
+│   └── ingest.py                  # one command: every chunk with its note
 ├── tests/                         # one test file per module, fake models only
 ├── CLAUDE.md                      # guidance for AI coding assistants
 ├── pyproject.toml                 # metadata, dependencies, tool settings

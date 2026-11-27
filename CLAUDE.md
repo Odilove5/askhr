@@ -36,6 +36,7 @@ uv run python -m askhr.connectors.downloader      # download the PDFs -> data/ra
 uv run python -m askhr.loader                     # read the PDFs
 uv run python -m askhr.chunker                    # cut into chunks
 uv run python -m askhr.context [doc_id]           # contextual notes (needs Ollama running)
+uv run python -m askhr.ingest [--doc ID] [--dry-run]  # all notes -> data/chunks.jsonl (resumable)
 ```
 
 The planned stack is fixed: Postgres 16 + pgvector for search (M2), LangGraph for the agent (M3), LangSmith for tracing during development. Don't introduce alternatives (for example Chroma) without asking.
@@ -48,6 +49,7 @@ The planned stack is fixed: Postgres 16 + pgvector for search (M2), LangGraph fo
 - `src/askhr/settings.py`: all configuration (pydantic-settings).
 - `src/askhr/llm.py`: the only place that builds chat models.
 - `src/askhr/context.py`: LCEL chain that writes a contextual note per chunk.
+- `src/askhr/notes_cache.py`, `ingest.py`: notes cache (JSON Lines) and the ingest command.
 - `tests/`: one test file per module; `tests/fixtures/` holds small saved web pages.
 
 ## Rules
